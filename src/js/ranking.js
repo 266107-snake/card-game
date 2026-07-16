@@ -1,10 +1,11 @@
-import { loadRanking } from "./storage.js";
-
-export async function getRankingSafe() {
-  try {
-    return await loadRanking();
-  } catch (error) {
-    console.warn("랭킹을 불러오지 못했습니다.", error);
-    return [];
-  }
+export function getLocalRanking(records = []) {
+  return [...records]
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, 10)
+    .map((record, index) => ({
+      rank: index + 1,
+      score: record.finalScore,
+      rounds: record.endedRound,
+      playedAt: record.playedAt,
+    }));
 }

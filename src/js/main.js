@@ -2,32 +2,20 @@ import "../styles/main.css";
 import { getJokerCount, drawCards } from "./cards.js";
 import { calculateRoundScore } from "./score.js";
 import { createInitialGame, createRecord } from "./gameState.js";
-import { isFirebaseConfigured } from "./firebase.js";
-import { listenToAuth, loginAnonymously, loginWithGoogle, logout } from "./auth.js";
-import { ensureUserDocument, loadLocalStats, loadUserStats, saveRecord } from "./storage.js";
-import { getRankingSafe } from "./ranking.js";
+import { addLocalRecord, loadLocalStats, resetLocalStats } from "./storage.js";
+import { getLocalRanking } from "./ranking.js";
 import { render } from "./ui.js";
 
 const app = document.querySelector("#app");
 
 const state = {
-  firebaseReady: isFirebaseConfigured,
-  user: null,
   stats: loadLocalStats(),
   ranking: [],
   game: createInitialGame(),
+  notice: "로그인 없이 이 브라우저에 기록을 저장합니다.",
 };
 
 const handlers = {
-  "login-google": async () => {
-    await loginWithGoogle();
-  },
-  "login-anon": async () => {
-    await loginAnonymously();
-  },
-  logout: async () => {
-    await logout();
-  },
   "select-round": ({ round }) => {
     state.game.selectedRounds = Number(round);
     paint();
@@ -41,10 +29,12 @@ const handlers = {
     const selectedRounds = state.game.selectedRounds;
     const selectedSkin = state.game.selectedSkin;
     state.game = { ...createInitialGame(), selectedRounds, selectedSkin, screen: "game" };
+    state.notice = "";
     paint();
   },
   "draw-cards": () => {
     if (state.game.currentRound >= state.game.selectedRounds) return;
+
     state.game.drawnCards = drawCards();
     state.game.pendingJokerValues = [];
     state.game.pendingJokerCount = getJokerCount(state.game.drawnCards);
@@ -73,26 +63,25 @@ const handlers = {
     const selectedRounds = state.game.selectedRounds;
     const selectedSkin = state.game.selectedSkin;
     state.game = { ...createInitialGame(), selectedRounds, selectedSkin };
+    state.notice = "새 도전을 준비했습니다.";
     paint();
   },
-  "show-records": async () => {
+  "show-records": () => {
     state.game.screen = "records";
-    state.ranking = await getRankingSafe();
+    state.ranking = getLocalRanking(state.stats.records);
     paint();
   },
   "go-home": () => {
     state.game.screen = "home";
     paint();
   },
+  "reset-records": () => {
+    state.stats = resetLocalStats();
+    state.ranking = [];
+    state.notice = "기록을 초기화했습니다.";
+    paint();
+  },
 };
-
-listenToAuth(async (user) => {
-  state.user = user;
-  if (user) await ensureUserDocument(user);
-  state.stats = await loadUserStats(user);
-  state.ranking = await getRankingSafe();
-  paint();
-});
 
 function finishRound() {
   const result = calculateRoundScore(state.game.drawnCards, state.game.pendingJokerValues);
@@ -106,6 +95,7 @@ function finishRound() {
     endGame("라운드 완료");
     return;
   }
+
   paint();
 }
 
@@ -117,9 +107,10 @@ async function endGame(endType) {
 
   state.game.endType = endType;
   const record = createRecord(state.game, endType);
-  state.stats = await saveRecord(record, state.user);
+  state.stats = addLocalRecord(record);
   state.game.screen = "result";
   state.game.countdown = 5;
+  state.notice = "기록이 이 브라우저에 저장되었습니다.";
   paint();
   startCountdown();
 }

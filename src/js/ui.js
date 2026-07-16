@@ -10,7 +10,7 @@ export function render(app, state, handlers) {
           <p class="eyebrow">Card Draw Combo</p>
           <h1>숫자 카드 콤보</h1>
         </div>
-        <div class="auth">${renderAuth(state)}</div>
+        <div class="auth">${renderStatus(state)}</div>
       </header>
       ${renderScreen(state)}
     </main>
@@ -19,20 +19,10 @@ export function render(app, state, handlers) {
   bindEvents(app, handlers);
 }
 
-function renderAuth(state) {
-  const user = state.user;
-  if (!state.firebaseReady) {
-    return `<span class="status offline">Firebase 미설정 · 로컬 저장</span>`;
-  }
-  if (!user) {
-    return `
-      <button data-action="login-google">Google 로그인</button>
-      <button data-action="login-anon" class="ghost">익명 시작</button>
-    `;
-  }
+function renderStatus(state) {
   return `
-    <span class="status">${user.displayName || "익명 플레이어"}</span>
-    <button data-action="logout" class="ghost">로그아웃</button>
+    <span class="status offline">로그인 없음 · 로컬 저장</span>
+    ${state.notice ? `<span class="auth-note">${state.notice}</span>` : ""}
   `;
 }
 
@@ -127,7 +117,7 @@ function renderResult(state) {
       <p class="message">${game.countdown > 0 ? `${game.countdown}초 후 다시 도전 가능` : "다시 도전할 수 있습니다."}</p>
       <div class="actions">
         <button data-action="restart" class="primary" ${game.countdown > 0 ? "disabled" : ""}>다시 도전</button>
-        <button data-action="show-records" class="ghost">기록 보기</button>
+          <button data-action="show-records" class="ghost">기록 보기</button>
       </div>
     </section>
   `;
@@ -140,7 +130,7 @@ function renderRecords(state) {
       <div class="records-head">
         <div>
           <p class="eyebrow">Records</p>
-          <h2>기록과 랭킹</h2>
+          <h2>내 기록</h2>
         </div>
         <button data-action="go-home" class="ghost">시작 화면</button>
       </div>
@@ -167,11 +157,14 @@ function renderRecords(state) {
           </tbody>
         </table>
       </div>
-      <h3>전체 랭킹</h3>
+      <h3>내 최고 기록 TOP 10</h3>
       <div class="ranking-list">
         ${(state.ranking || []).map((rank, index) => `
-          <div><span>${index + 1}. ${rank.displayName}</span><strong>${rank.bestScore}점</strong></div>
-        `).join("") || `<p class="message">Firebase 연결 후 랭킹을 볼 수 있습니다.</p>`}
+          <div><span>${index + 1}. ${formatDate(rank.playedAt)} · ${rank.rounds}라운드</span><strong>${rank.score}점</strong></div>
+        `).join("") || `<p class="message">아직 순위에 올릴 기록이 없습니다.</p>`}
+      </div>
+      <div class="actions">
+        <button data-action="reset-records" class="ghost">기록 초기화</button>
       </div>
     </section>
   `;
@@ -196,4 +189,14 @@ function bindEvents(app, handlers) {
 
 function formatScore(score) {
   return score === null || score === undefined ? "-" : `${score}점`;
+}
+
+function formatDate(value) {
+  if (!value) return "날짜 없음";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
